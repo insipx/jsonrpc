@@ -1,5 +1,4 @@
 //! JSON-RPC websocket client implementation.
-use super::duplex::Duplex;
 use crate::{RpcChannel, RpcError};
 use failure::Error;
 use futures::prelude::*;
@@ -50,14 +49,11 @@ where
 
 /// Same as `connect` but does not spawn duplex on default tokio executor
 /// lets the user decide how to spawn duplex
-pub fn raw_connect<T, TSink, TStream, TError>(
+pub fn raw_connect<T>(
 	client_builder: ClientBuilder,
 ) -> impl Future<Item = (T, impl Future<Item = (), Error = ()>), Error = RpcError>
 where
 	T: From<RpcChannel>,
-	TError: Into<Error>,
-	TSink: Sink<SinkItem = OwnedMessage, SinkError = TError>,
-	TStream: Stream<Item = OwnedMessage, Error = TError>,
 {
 	client_builder
 		.async_connect(None)
