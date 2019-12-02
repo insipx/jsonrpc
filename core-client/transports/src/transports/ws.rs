@@ -1,4 +1,5 @@
 //! JSON-RPC websocket client implementation.
+use super::duplex::Duplex;
 use crate::{RpcChannel, RpcError};
 use failure::Error;
 use futures::prelude::*;
@@ -43,6 +44,28 @@ where
 			let rpc_client = rpc_client.map_err(|error| eprintln!("{:?}", error));
 			tokio::spawn(rpc_client);
 			sender.into()
+		})
+		.map_err(|error| RpcError::Other(error.into()))
+}
+
+/// Same as `connect` but does not spawn duplex on default tokio executor
+/// lets the user decide how to spawn duplex
+pub fn raw_connect<T, TSink, TStream, TError>(
+	client_builder: ClientBuilder,
+) -> impl Future<Item = (T, impl Future<Item = (), Error = ()>), Error = RpcError>
+where
+	T: From<RpcChannel>,
+	TError: Into<Error>,
+	TSink: Sink<SinkItem = OwnedMessage, SinkError = TError>,
+	TStream: Stream<Item = OwnedMessage, Error = TError>,
+{
+	client_builder
+		.async_connect(None)
+		.map(|(client, _)| {
+			let (sink, stream) = client.split();
+			let (sink, stream) = WebsocketClient::new(sink, stream).split();
+			let (rpc_client, sender) = super::duplex(sink, stream);
+			(sender.into(), rpc_client.map_err(|error| eprintln!("{:?}", error)))
 		})
 		.map_err(|error| RpcError::Other(error.into()))
 }
